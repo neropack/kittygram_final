@@ -9,9 +9,7 @@ services:
       - pg_data:/var/lib/postgresql/data
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: neropack/kittygram_backend:latest  # DockerHub username
     restart: always
     volumes:
       - static:/var/www/static
@@ -22,24 +20,19 @@ services:
       - db
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: neropack/kittygram_frontend:latest
     restart: always
     volumes:
       - static:/var/www/static/frontend
 
   gateway:
-    build:
-      context: ./nginx
-      dockerfile: Dockerfile
+    image: neropack/kittygram_gateway:latest
     restart: always
     ports:
       - "9000:80"
     volumes:
       - static:/var/www/static
       - media:/var/www/media
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - backend
       - frontend
