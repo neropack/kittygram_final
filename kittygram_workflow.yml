@@ -132,7 +132,8 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           source: "docker-compose.production.yml"
-          target: "kittygram/docker-compose.production.yml"
+          target: "kittygram/"
+          strip_components: 0
       - name: Executing remote ssh commands to deploy
         uses: appleboy/ssh-action@master
         with:
@@ -140,10 +141,11 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            mkdir -p ~/kittygram
             cd ~/kittygram
             sudo docker-compose -f docker-compose.production.yml pull
             sudo docker-compose -f docker-compose.production.yml down
             sudo docker-compose -f docker-compose.production.yml up -d
             sudo docker-compose -f docker-compose.production.yml exec backend python manage.py migrate
             sudo docker-compose -f docker-compose.production.yml exec backend python manage.py collectstatic --noinput
-            sudo docker-compose -f docker-compose.production.yml exec backend cp -r /app/collected_static/. /backend_static/
+            sudo docker-compose -f docker-compose.production.yml exec backend cp -r collected_static/. /backend_static/
