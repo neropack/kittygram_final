@@ -125,16 +125,16 @@ jobs:
       - build_gateway
     steps:
       - uses: actions/checkout@v3
-      - name: Copy docker-compose.yml via ssh
+      - name: Copy files via ssh
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          source: "docker-compose.production.yml"
+          source: "docker-compose.production.yml,.env.example"
           target: "kittygram/"
           strip_components: 0
-      - name: Executing remote ssh commands to deploy
+      - name: Deploy to server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST }}
@@ -144,17 +144,45 @@ jobs:
             mkdir -p ~/kittygram
             cd ~/kittygram
             
-            # Проверяем наличие docker compose V2
-            docker compose version
+            # Создаем .env из .env.example если его нет
+            if [ ! -f .env ]; then
+              cp .env.example .env
+              echo "✅ .env created from .env.example"
+            else
+              echo "ℹ️ .env already exists"
+            fi
             
-            docker compose -f docker-compose.production.yml pull
-            docker compose -f docker-compose.production.yml down
-            docker compose -f docker-compose.production.yml up -d
-            sleep 15
+            echo "📋 Environment variables:"
+            grep -E '^(DB_|SECRET_KEY|DEBUG)' .env || true
             
-            docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate
-            docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
-            docker compose -f docker-compose.production.yml exec -T backend cp -r collected_static/. /backend_static/
+            echo "🐳 Docker Compose version:"
+            sudo docker compose version
             
-            echo "✅ Kittygram deployed successfully!"
-            docker compose -f docker-compose.production.yml ps
+            echo "⬇️ Pulling latest images..."
+            sudo docker compose -f docker-compose.production.yml pull
+            
+            echo "🛑 Stopping old containers..."
+            sudo docker compose -f docker-compose.production.yml down || true
+            
+            echo "🚀 Starting containers..."
+            sudo docker compose -f docker-compose.production.yml up -d
+            
+            echo "⏳ Waiting 30s for startup..."
+            sleep 30
+            
+            echo "🔄 Running database migrations..."
+            sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate
+            
+            echo "📦 Collecting static files..."
+            sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
+            
+            echo "📁 Copying static files to volume..."
+            sudo docker compose -f docker-compose.production.yml exec -T backend cp -r collected_static/. /backend_static/ || true
+            
+            echo "📊 Container status:"
+            sudo docker compose -f docker-compose.production.yml ps
+            
+            echo "📋 Backend logs (last 10):"
+            sudo docker compose -f docker-compose.production.yml logs --tail=10 backend || true
+            
+            echo "🎉 ✅ Kittygram deployed successfully!"
